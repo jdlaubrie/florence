@@ -7,6 +7,7 @@ from .TranservselyIsotropicLinearElastic import *
 # NONLINEAR MATERIAL MODELS
 from .NeoHookean import *
 from .NeoHookean_1 import *
+from .NeoHookean_2 import *
 from .NeoHookeanCoercive import *
 from .NearlyIncompressibleNeoHookean import *
 from .MooneyRivlin import *

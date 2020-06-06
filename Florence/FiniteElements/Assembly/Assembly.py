@@ -18,20 +18,20 @@ import multiprocessing
 import Florence.ParallelProcessing.parmap as parmap
 
 
-__all__ = ['Assemble', 'AssembleForces', 'AssembleExplicit', 'AssembleMass', 'AssembleForm']
+__all__ = ['Assemble', 'AssembleForces', 'AssembleExplicit', 'AssembleMass', 'AssembleForm', 'AssembleFollowerForces']
 
 
 
-def Assemble(fem_solver, function_space, formulation, mesh, material, Eulerx, Eulerp):
+def Assemble(fem_solver, function_spaces, formulation, mesh, material, Eulerx, Eulerp, boundary_condition):
 
     if fem_solver.has_low_level_dispatcher:
-        return LowLevelAssembly(fem_solver, function_space, formulation, mesh, material, Eulerx, Eulerp)
+        return LowLevelAssembly(fem_solver, function_spaces[0], formulation, mesh, material, Eulerx, Eulerp)
     else:
         if mesh.nelem <= 600000:
-            return AssemblySmall(fem_solver, function_space, formulation, mesh, material, Eulerx, Eulerp)
+            return AssemblySmall(fem_solver, function_spaces, formulation, mesh, material, Eulerx, Eulerp, boundary_condition)
         elif mesh.nelem > 600000:
             print("Larger than memory system. Dask on disk parallel assembly is turned on")
-            return OutofCoreAssembly(fem_solver, function_space, formulation, mesh, material, Eulerx, Eulerp)
+            return OutofCoreAssembly(fem_solver, function_spaces[0], formulation, mesh, material, Eulerx, Eulerp)
 
 
 def LowLevelAssembly(fem_solver, function_space, formulation, mesh, material, Eulerx, Eulerp):
@@ -96,7 +96,7 @@ def LowLevelAssembly(fem_solver, function_space, formulation, mesh, material, Eu
 
 
 
-def AssemblySmall(fem_solver, function_space, formulation, mesh, material, Eulerx, Eulerp):
+def AssemblySmall(fem_solver, function_spaces, formulation, mesh, material, Eulerx, Eulerp, boundary_condition):
 
     t_assembly = time()
 
@@ -143,7 +143,7 @@ def AssemblySmall(fem_solver, function_space, formulation, mesh, material, Euler
     if fem_solver.parallel:
         # COMPUATE ALL LOCAL ELEMENTAL MATRICES (STIFFNESS, MASS, INTERNAL & EXTERNAL TRACTION FORCES)
         ParallelTuple = parmap.map(formulation,np.arange(0,nelem,dtype=np.int32),
-            function_space, mesh, material, fem_solver, Eulerx, Eulerp, processes= int(multiprocessing.cpu_count()/2))
+            function_spaces[0], mesh, material, fem_solver, Eulerx, Eulerp, processes= int(multiprocessing.cpu_count()/2))
 
     for elem in range(nelem):
 
@@ -157,7 +157,7 @@ def AssemblySmall(fem_solver, function_space, formulation, mesh, material, Euler
             # COMPUATE ALL LOCAL ELEMENTAL MATRICES (STIFFNESS, MASS, INTERNAL & EXTERNAL TRACTION FORCES )
             I_stiff_elem, J_stiff_elem, V_stiff_elem, t, f, \
             I_mass_elem, J_mass_elem, V_mass_elem = formulation.GetElementalMatrices(elem,
-                function_space, mesh, material, fem_solver, Eulerx, Eulerp)
+                function_spaces[0], mesh, material, fem_solver, Eulerx, Eulerp)
 
         if fem_solver.recompute_sparsity_pattern:
             # SPARSE ASSEMBLY - STIFFNESS MATRIX
@@ -187,11 +187,11 @@ def AssemblySmall(fem_solver, function_space, formulation, mesh, material, Euler
                     V_mass[data_global_indices[elem*local_capacity:(elem+1)*local_capacity]] \
                     += V_mass_elem[data_local_indices[elem*local_capacity:(elem+1)*local_capacity]]
 
-        if fem_solver.has_moving_boundary:
+        #if fem_solver.has_moving_boundary:
             # RHS ASSEMBLY
             # for iterator in range(0,nvar):
             #     F[mesh.elements[elem,:]*nvar+iterator,0]+=f[iterator::nvar,0]
-            RHSAssemblyNative(F,f,elem,nvar,nodeperelem,mesh.elements)
+            #RHSAssemblyNative(F,f,elem,nvar,nodeperelem,mesh.elements)
 
         # INTERNAL TRACTION FORCE ASSEMBLY
         # for iterator in range(0,nvar):
@@ -233,6 +233,11 @@ def AssemblySmall(fem_solver, function_space, formulation, mesh, material, Euler
                 shape=((nvar*mesh.points.shape[0],nvar*mesh.points.shape[0])))
 
             fem_solver.is_mass_computed = True
+
+    if fem_solver.has_moving_boundary:
+        K_pressure, F_pressure = AssemblyFollowerForces(boundary_condition, mesh, material, function_spaces, fem_solver, Eulerx)
+        stiffness -= K_pressure
+        T -= F_pressure[:,None]
 
     fem_solver.assembly_time = time() - t_assembly
 
@@ -380,6 +385,60 @@ def OutofCoreAssembly(fem_solver, function_space, formulation, mesh, material,
     return stiffness, T, F, mass
 
 
+#------------------------------- ASSEMBLY ROUTINE FOR EXTERNAL PRESSURE FORCES ----------------------------------#
+def AssemblyFollowerForces(boundary_condition, mesh, material, function_spaces, fem_solver, Eulerx):
+    """Compute/assemble surface follower forces"""
+
+    if boundary_condition.pressure_flags is None:
+        raise ValueError("Pressure boundary conditions are not set for the analysis")
+
+    ndim = mesh.InferSpatialDimension()
+    nvar = material.nvar
+
+    # FOLLOWER FORCES DEPEND OF THE DIRECTION OF THE FACE/SURFACE
+    if boundary_condition.pressure_flags.shape[0] == mesh.points.shape[0]:
+        boundary_condition.pressure_data_applied_at = "node"
+        raise ValueError("Follower forces applied at nodes. Follower forces should be applied at faces.")
+
+    # FUNCTION SPACES TO MAP THE SURFACE FORCE ALONG THE FACE OF THE ELEMENT
+    if not isinstance(function_spaces,tuple):
+        raise ValueError("Boundary functional spaces not available for computing pressure stiffness")
+    else:
+        # CHECK IF A FUNCTION SPACE FOR BOUNDARY EXISTS - SAFEGAURDS AGAINST FORMULATIONS THAT DO NO PROVIDE ONE
+        has_boundary_spaces = False
+        for fs in function_spaces:
+            if ndim == 3 and fs.ndim == 2:
+                has_boundary_spaces = True
+                break
+            elif ndim == 2 and fs.ndim == 1:
+                has_boundary_spaces = True
+                break
+        if not has_boundary_spaces:
+            from Florence import QuadratureRule, FunctionSpace
+            # COMPUTE BOUNDARY FUNCTIONAL SPACES
+            p = mesh.InferPolynomialDegree()
+            bquadrature = QuadratureRule(optimal=3, norder=2*p+1,
+                mesh_type=mesh.boundary_element_type, is_flattened=False)
+            bfunction_space = FunctionSpace(mesh.CreateDummyLowerDimensionalMesh(),
+                bquadrature, p=p, equally_spaced=mesh.IsEquallySpaced, use_optimal_quadrature=False)
+            function_spaces = (function_spaces[0],bfunction_space)
+
+    # COMPUTE AND ASSEMBLY OF THE SURFACE FOLLOWER FORCES
+    from .FollowerForces import FollowerForces
+    if boundary_condition.analysis_type == "static":
+        if fem_solver.recompute_sparsity_pattern:
+            I_stiffness, J_stiffness, V_stiffness, F = FollowerForces(boundary_condition, mesh, material, function_spaces[-1], fem_solver, Eulerx)
+            stiffness = coo_matrix((V_stiffness,(I_stiffness,J_stiffness)),
+                shape=((nvar*mesh.points.shape[0],nvar*mesh.points.shape[0])),dtype=np.float64).tocsr()
+        else:
+            V_stiffness, F = StaticForces(boundary_condition, mesh, material, function_spaces[-1], fem_solver, Eulerx)
+            stiffness = csr_matrix((V_stiffness,fem_solver.indices,fem_solver.indptr),
+                shape=((nvar*mesh.points.shape[0],nvar*mesh.points.shape[0])))
+
+    elif boundary_condition.analysis_type == "dynamic":
+        raise ValueError("Follower forces implemented for dynamic problems.")
+
+    return stiffness, F
 
 
 #----------------- ASSEMBLY ROUTINE FOR TRACTION FORCES ONLY - FOR MODIFIED NEWTON RAPHSON ----------------------#

@@ -75,7 +75,10 @@ class BoundaryCondition(object):
 
         self.dirichlet_flags = None
         self.neumann_flags = None
+        self.pressure_flags = None
         self.applied_neumann = None
+        self.applied_pressure = None
+        self.pressure_increment = 1.
         self.is_applied_neumann_shape_functions_computed = False
         self.is_body_force_shape_functions_computed = False
 
@@ -84,6 +87,8 @@ class BoundaryCondition(object):
         self.step_wise_dirichlet_data = None
         self.has_step_wise_neumann_loading = False
         self.step_wise_neumann_data = None
+        self.has_step_wise_pressure_loading = False
+        self.step_wise_pressure_data = None
 
         self.compound_dirichlet_bcs = compound_dirichlet_bcs
 
@@ -267,6 +272,29 @@ class BoundaryCondition(object):
                     "should return one flag and one data array".format(func.__name__))
             self.neumann_flags = tups[0]
             self.applied_neumann = tups[1]
+            return tups
+
+    def SetPressureCriteria(self, func, *args, **kwargs):
+        """Applies user defined Neumann data to self
+        """
+
+        if "apply" in kwargs.keys():
+            del kwargs["apply"]
+            self.has_step_wise_pressure_loading = True
+            self.step_wise_pressure_data = {'func':func, 'args': args, 'kwargs': kwargs}
+            tups = func(0, *args, **kwargs)
+        else:
+            tups = func(*args, **kwargs)
+
+        if not isinstance(tups,tuple):
+            raise ValueError("User-defined Pressure criterion function {} "
+                "should return one flag and one data array".format(func.__name__))
+        else:
+            if len(tups) !=2:
+                raise ValueError("User-defined Pressure criterion function {} "
+                    "should return one flag and one data array".format(func.__name__))
+            self.pressure_flags = tups[0]
+            self.applied_pressure = tups[1]
             return tups
 
 

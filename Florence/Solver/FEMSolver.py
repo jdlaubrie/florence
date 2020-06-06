@@ -613,8 +613,8 @@ class FEMSolver(object):
 
         # ASSEMBLE STIFFNESS MATRIX AND TRACTION FORCES FOR THE FIRST TIME
         if self.analysis_type == "static":
-            K, TractionForces, _, _ = Assemble(self, function_spaces[0], formulation, mesh, material,
-                Eulerx, Eulerp)
+            K, TractionForces, _, _ = Assemble(self, function_spaces, formulation, mesh, material,
+                Eulerx, Eulerp, boundary_condition)
         else:
             if self.reduce_quadrature_for_quads_hexes:
                 fspace = function_spaces[0] if (mesh.element_type=="hex" or mesh.element_type=="quad") else function_spaces[1]
@@ -818,12 +818,16 @@ class FEMSolver(object):
         LoadFactor = 1./LoadIncrement
         AppliedDirichletInc = np.zeros(boundary_condition.applied_dirichlet.shape[0],dtype=np.float64)
 
+        LoadFactorAdd = 0.
         for Increment in range(LoadIncrement):
 
             # CHECK ADAPTIVE LOAD FACTOR
             if self.load_factor is not None:
                 LoadFactor = self.load_factor[Increment]
 
+            # PRESSURE INCREMENT IF THE LOAD IS IN SEVERAL STEPS
+            LoadFactorAdd += LoadFactor
+            boundary_condition.pressure_increment = LoadFactorAdd
             # APPLY NEUMANN BOUNDARY CONDITIONS
             DeltaF = LoadFactor*NeumannForces
             NodalForces += DeltaF
@@ -932,8 +936,8 @@ class FEMSolver(object):
             Eulerp += dU[:,-1]
 
             # RE-ASSEMBLE - COMPUTE STIFFNESS AND INTERNAL TRACTION FORCES
-            K, TractionForces = Assemble(self, function_spaces[0], formulation, mesh, material,
-                Eulerx,Eulerp)[:2]
+            K, TractionForces = Assemble(self, function_spaces, formulation, mesh, material,
+                Eulerx, Eulerp, boundary_condition)[:2]
 
             # FIND THE RESIDUAL
             Residual[boundary_condition.columns_in] = TractionForces[boundary_condition.columns_in] -\
@@ -958,7 +962,7 @@ class FEMSolver(object):
                 break
 
             # BREAK BASED ON INCREMENTAL SOLUTION - KEEP IT AFTER UPDATE
-            if norm(dU) <=  self.newton_raphson_solution_tolerance:
+            if norm(dU) <=  self.newton_raphson_solution_tolerance and Iter!=0:
                 print("Incremental solution within tolerance i.e. norm(dU): {}".format(norm(dU)))
                 break
 
