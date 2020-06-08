@@ -21,9 +21,6 @@ class NeoHookean_2(Material):
         mtype = type(self).__name__
         super(NeoHookean_2, self).__init__(mtype, ndim, **kwargs)
 
-        self.is_nearly_incompressible = True
-        self.is_compressible = False
-
         self.is_transversely_isotropic = False
         self.energy_type = "internal_energy"
         self.nature = "nonlinear"
@@ -35,10 +32,10 @@ class NeoHookean_2(Material):
             self.H_VoigtSize = 3
 
         # LOW LEVEL DISPATCHER
-        self.has_low_level_dispatcher = False
+        self.has_low_level_dispatcher = True
 
     def KineticMeasures(self,F, elem=0):
-        from Kuru.MaterialLibrary.LLDispatch._NeoHookean_2 import KineticMeasures
+        from Florence.MaterialLibrary.LLDispatch._NeoHookean_2_ import KineticMeasures
         return KineticMeasures(self,np.ascontiguousarray(F))
 
 

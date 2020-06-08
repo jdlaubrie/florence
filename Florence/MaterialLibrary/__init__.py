@@ -4,6 +4,7 @@ from .MaterialBase import Material
 from .LinearElastic import *
 from .IncrementalLinearElastic import *
 from .TranservselyIsotropicLinearElastic import *
+
 # NONLINEAR MATERIAL MODELS
 from .NeoHookean import *
 from .NeoHookean_1 import *
@@ -22,6 +23,7 @@ from .TranservselyIsotropicHyperElastic import *
 from .BonetTranservselyIsotropicHyperElastic import *
 from .AnisotropicMooneyRivlin_0 import *
 from .AnisotropicMooneyRivlin_1 import *
+from .AnisotropicFungQuadratic import *
 
 # ELECTROMECHANICAL MATERIAL MODELS - ENTHALPY
 from .IsotropicElectroMechanics_0 import *

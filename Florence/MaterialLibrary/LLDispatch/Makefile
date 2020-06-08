@@ -80,5 +80,4 @@ clean:
 	$(REMOVE) CythonSource/_$(MATERIAL)_.cpp _$(MATERIAL)_.$(EXT_POSTFIX)
 
 source_clean:
-	clean:
 	$(REMOVE) CythonSource/_$(MATERIAL)_.cpp

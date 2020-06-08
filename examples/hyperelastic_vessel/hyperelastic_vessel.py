@@ -9,7 +9,7 @@ from Florence import *
 #============================================================
 #============= ANISOTROPIC FIBRE DIRECTIONS  ================
 #============================================================
-def Directions(mesh):
+def FibreDirections(mesh):
     """
         Routine dedicated to compute the fibre direction of components in integration point for 
         the Material in Florence and for the auxiliar routines in this script. First three directions 
@@ -21,20 +21,19 @@ def Directions(mesh):
     # Geometric definitions per element
     divider = mesh.elements.shape[1]
     directrix = [0.,1.,0.]
-    direction = np.zeros((mesh.nelem,nfibre,ndim),dtype=np.float64)
+    fibre_direction = np.zeros((mesh.nelem,nfibre,ndim),dtype=np.float64)
     # Loop throught the element in the mesh
     for elem in range(mesh.nelem):
         # Geometric definitions per element
-        #if iset==0:
         center = np.sum(mesh.points[mesh.elements[elem,:],:],axis=0)/divider
         tangential = np.cross(directrix,center)
         tangential = tangential/np.linalg.norm(tangential)
         normal = np.cross(tangential,directrix)
         # Define the anisotropic orientations
-        direction[elem][0][:]=np.multiply(directrix,np.cos(np.pi/4.)) + np.multiply(tangential,np.sin(np.pi/4.))
-        direction[elem][1][:]=np.multiply(directrix,np.cos(np.pi/4.)) - np.multiply(tangential,np.sin(np.pi/4.))
+        fibre_direction[elem,0,:]=np.multiply(directrix,np.cos(np.pi/4.)) + np.multiply(tangential,np.sin(np.pi/4.))
+        fibre_direction[elem,1,:]=np.multiply(directrix,np.cos(np.pi/4.)) - np.multiply(tangential,np.sin(np.pi/4.))
 
-    return direction
+    return fibre_direction
 
 #============================================================
 #===============  HOMOGENIZED CMT  ==========================
@@ -81,14 +80,20 @@ def hyperelastic_vessel(p=1):
 
     #===============  MATERIAL DEFINITION  ====================
 
+    fibre_direction = FibreDirections(mesh)
+
     # Define hyperelastic material for the vessel
-    material = NeoHookean_2(ndim,
-            mu=144.0*1050.,
-            kappa=144.0*1050.*33.0)
+    material = AnisotropicFungQuadratic(ndim,
+            mu=72.*525.,
+            kappa=72.*525.*33.,
+            k1=568.*525.,
+            k2=11.2,
+            anisotropic_orientations=fibre_direction)
 
     # kappa/mu=20  => nu=0.475 (Poisson's ratio)
     # kappa/mu=33  => nu=0.485 (Poisson's ratio)
     # kappa/mu=100 => nu=0.495 (Poisson's ratio)
+
     #==================  FORMULATION  =========================
     formulation = DisplacementFormulation(mesh)
 
@@ -97,8 +102,8 @@ def hyperelastic_vessel(p=1):
     def Dirichlet_Function(mesh, DirichletBoundary):
         boundary_data = np.zeros((mesh.nnode, 3))+np.NAN
         # boundary conditions base on BoundarySurface boolean array
-        boundary_data[DirichletBoundary['Bottom'],:] = 0.
-        boundary_data[DirichletBoundary['Top'],1] = 0.
+        boundary_data[DirichletBoundary['Bottom'],1] = 0.
+        boundary_data[DirichletBoundary['Top'],:] = 0.
         boundary_data[DirichletBoundary['SymmetryZ'],2] = 0.
 
         return boundary_data
@@ -139,6 +144,8 @@ def hyperelastic_vessel(p=1):
         boundary_condition=boundary_condition)
     # Print solution to VTK
     solution.WriteVTK('hyperelastic_vessel',quantity=0)
+    # Check displacements at (inner and outer nodes, X-coordinate, last step)
+    print(solution.sol[[0,1],0,-1])
     
 
 if __name__ == "__main__":

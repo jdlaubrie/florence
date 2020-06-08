@@ -234,7 +234,7 @@ def AssemblySmall(fem_solver, function_spaces, formulation, mesh, material, Eule
 
             fem_solver.is_mass_computed = True
 
-    if fem_solver.has_moving_boundary:
+    if boundary_condition.applied_pressure is not None:
         K_pressure, F_pressure = AssemblyFollowerForces(boundary_condition, mesh, material, function_spaces, fem_solver, Eulerx)
         stiffness -= K_pressure
         T -= F_pressure[:,None]

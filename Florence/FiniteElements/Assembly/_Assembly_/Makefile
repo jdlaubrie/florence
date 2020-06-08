@@ -118,7 +118,8 @@ cython_assembler_build:
 	@echo "Building florence FEM follower forces assembler module"
 	$(CYTHON) FollowerForces.pyx
 	$(CXX) $(CXXSTD) $(CXXFLAGS) FollowerForces.cpp -o FollowerForces.$(EXT_POSTFIX) -I. \
-	-I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH) -L$(PYTHON_LD_PATH) -l$(PYTHON_VERSION)
+	-I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH) -L$(PYTHON_LD_PATH) -l$(PYTHON_VERSION) -I$(KIN_INC) \
+	-I../../../Tensor/ -I$(GEO_INC) -I$(MASS_INC) -I$(BLAS_INCLUDE_PATH) -L$(BLAS_LD_PATH) -l$(BLAS_VERSION)
 	$(MOVE) FollowerForces.$(EXT_POSTFIX) ../
 
 

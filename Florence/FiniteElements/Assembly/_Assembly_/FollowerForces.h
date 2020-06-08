@@ -9,6 +9,7 @@
 #endif
 
 #include <Fastor/Fastor.h>
+#include "assembly_helper.h"
 #include "SparseAssemblyNative.h"
 
 #ifndef LL_TYPES
@@ -42,113 +43,6 @@ FASTOR_INLINE void deallocate(T *a) {
 #endif
 }
 #endif //CUSTOM_ALLOCATION_
-/*---------------------------------------------------------------------------------------------*/
-
-/*---------------------------------------------------------------------------------------------*/
-#ifndef SPARSE_TRIPLET_FILLER
-#define SPARSE_TRIPLET_FILLER
-// IJV Filler
-FASTOR_INLINE
-void fill_triplet(  const Integer *i,
-                    const Integer *j,
-                    const Real *coeff,
-                    int *I,
-                    int *J,
-                    Real *V,
-                    Integer elem,
-                    Integer nvar,
-                    Integer nodeperelem,
-                    const UInteger *elements,
-                    Integer i_shape,
-                    Integer j_shape
-                    ) {
-
-    Integer ndof = nvar*nodeperelem;
-    Integer *current_row_column = allocate<Integer>(nvar*nodeperelem);
-
-    Integer const_elem_retriever;
-    for (Integer counter=0; counter<nodeperelem; ++counter) {
-        const_elem_retriever = nvar*elements[elem*nodeperelem+counter];
-        for (Integer ncounter=0; ncounter<nvar; ++ncounter) {
-            current_row_column[nvar*counter+ncounter] = const_elem_retriever+ncounter;
-        }
-    }
-
-    Integer icounter = 0;
-    Integer ncounter = ndof*ndof*elem;
-
-    Integer const_I_retriever;
-    for (Integer counter=0; counter<ndof; ++counter) {
-        const_I_retriever = current_row_column[counter];
-        for (Integer iterator=0; iterator<ndof; ++iterator) {
-            I[ncounter] = const_I_retriever;
-            J[ncounter] = current_row_column[iterator];
-            V[ncounter] = coeff[icounter];
-            ncounter++;
-            icounter++;
-        }
-    }
-
-    deallocate(current_row_column);
-}
-
-
-
-FASTOR_INLINE
-void fill_global_data(
-                    const Integer *i,
-                    const Integer *j,
-                    const Real *coeff,
-                    int *I,
-                    int *J,
-                    Real *V,
-                    Integer elem,
-                    Integer nvar,
-                    Integer nodeperelem,
-                    const UInteger *elements,
-                    Integer i_shape,
-                    Integer j_shape,
-                    int recompute_sparsity_pattern,
-                    int squeeze_sparsity_pattern,
-                    const int *data_local_indices,
-                    const int *data_global_indices,
-                    const UInteger *sorted_elements,
-                    const Integer *sorter
-    )
-{
-
-    if (recompute_sparsity_pattern) {
-        fill_triplet(i,j,coeff,I,J,V,elem,nvar,nodeperelem,elements,i_shape,j_shape);
-    }
-    else {
-        if (squeeze_sparsity_pattern) {
-            SparseAssemblyNativeCSR_RecomputeDataIndex_(
-                coeff,
-                J,
-                I,
-                V,
-                elem,
-                nvar,
-                nodeperelem,
-                sorted_elements,
-                sorter);
-        }
-        else {
-            const int ndof = nvar*nodeperelem;
-            const int local_capacity = ndof*ndof;
-            SparseAssemblyNativeCSR_(
-                coeff,
-                data_local_indices,
-                data_global_indices,
-                elem,
-                local_capacity,
-                V
-                );
-        }
-    }
-}
-
-#endif //SPARSE_TRIPLET_FILLER
 /*---------------------------------------------------------------------------------------------*/
 
 

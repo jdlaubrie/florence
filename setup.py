@@ -388,6 +388,8 @@ class FlorenceSetup(object):
                                     "_NearlyIncompressibleMooneyRivlin_",
                                     "_AnisotropicMooneyRivlin_1_",
                                     "_ExplicitMooneyRivlin_",
+                                    "_NeoHookean_2_",
+                                    "_AnisotropicFungQuadratic_",
                                     "_IsotropicElectroMechanics_0_",
                                     "_IsotropicElectroMechanics_3_",
                                     "_SteinmannModel_",
@@ -424,8 +426,8 @@ class FlorenceSetup(object):
                     # Sparse and RHS assembler
                     execute('cd '+_path+' && make cython_assembler_build ' + self.compiler_args)
 
-                    ll_material_mech = low_level_material_list[:6]
-                    ll_material_electro_mech = low_level_material_list[6:]
+                    ll_material_mech = low_level_material_list[:8]
+                    ll_material_electro_mech = low_level_material_list[8:]
 
                     ll_material_mech.remove("_ExplicitMooneyRivlin_")
                     ll_material_electro_mech.remove("_IsotropicElectroMechanics_109_")
@@ -481,8 +483,8 @@ class FlorenceSetup(object):
             for _path in self.extension_paths:
                 if "_Assembly_" in _path:
 
-                    ll_material_mech = low_level_material_list[:6]
-                    ll_material_electro_mech = low_level_material_list[6:]
+                    ll_material_mech = low_level_material_list[:8]
+                    ll_material_electro_mech = low_level_material_list[8:]
 
                     ll_material_mech.remove("_ExplicitMooneyRivlin_")
                     ll_material_electro_mech.remove("_IsotropicElectroMechanics_109_")
