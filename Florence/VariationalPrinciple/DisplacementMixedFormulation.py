@@ -70,40 +70,6 @@ class DisplacementFormulation(VariationalPrinciple):
         return I_stiff_elem, J_stiff_elem, V_stiff_elem, t, f, I_mass_elem, J_mass_elem, V_mass_elem
 
 
-
-    def GetElementalMatricesInVectorForm(self, elem, function_space, mesh, material, fem_solver, Eulerx, TotalPot):
-
-        massel=[]; f = []
-        # GET THE FIELDS AT THE ELEMENT LEVEL
-        LagrangeElemCoords = mesh.points[mesh.elements[elem,:],:]
-        EulerElemCoords = Eulerx[mesh.elements[elem,:],:]
-
-        # COMPUTE THE TRACTION VECTOR
-        if material.has_low_level_dispatcher:
-            t = self.__GetLocalTraction__(function_space,material,
-            # t = self.GetLocalTraction(function_space,material,
-                LagrangeElemCoords,EulerElemCoords,fem_solver,elem)
-        else:
-            t = self.GetLocalTraction(function_space,material,
-                LagrangeElemCoords,EulerElemCoords,fem_solver,elem)
-
-        if fem_solver.analysis_type != 'static' and fem_solver.is_mass_computed is False:
-            # COMPUTE THE MASS MATRIX
-            if material.has_low_level_dispatcher:
-                # massel = self.__GetLocalMass__(function_space,material,LagrangeElemCoords,EulerElemCoords,fem_solver,elem)
-                massel = self.__GetLocalMass_Efficient__(function_space,material,LagrangeElemCoords,EulerElemCoords,fem_solver,elem)
-            else:
-                # massel = self.GetLocalMass(function_space,material,LagrangeElemCoords,EulerElemCoords,fem_solver,elem)
-                massel = self.GetLocalMass_Efficient(function_space,material,LagrangeElemCoords,EulerElemCoords,fem_solver,elem)
-
-            if fem_solver.analysis_subtype == "explicit" and fem_solver.mass_type == "lumped":
-                massel = self.GetLumpedMass(massel)
-
-
-        return t, f, massel
-
-
-
     def GetLocalStiffness(self, function_space, material, LagrangeElemCoords, EulerELemCoords, fem_solver, elem=0):
         """Get stiffness matrix of the system"""
 
@@ -146,10 +112,10 @@ class DisplacementFormulation(VariationalPrinciple):
             # COMPUTE ONCE detJ
             detJ = np.einsum('i,i->i',AllGauss[:,0],np.abs(det(ParentGradientX)))
 
+        dV = np.einsum('i,i->i',AllGauss[:,0],np.abs(det(ParentGradientX)))
 
         # COMPUTE PARAMETERS FOR MEAN DILATATION METHOD, IT NEEDS TO BE BEFORE COMPUTE HESSIAN AND STRESS
-        if material.is_nearly_incompressible:
-            dV = np.einsum('i,i->i',AllGauss[:,0],np.abs(det(ParentGradientX)))
+        if material.is_incompressible:
             stiffness_k = self.VolumetricStiffnessIntegrand(material, SpatialGradient, detJ, dV)
             stiffness += stiffness_k
 
@@ -187,11 +153,8 @@ class DisplacementFormulation(VariationalPrinciple):
         """Get stiffness matrix of the system"""
 
         # GET LOCAL KINEMATICS
-        SpatialGradient, F, detJ, dV = _KinematicMeasures_(function_space.Jm, function_space.AllGauss[:,0],
+        SpatialGradient, F, detJ = _KinematicMeasures_(function_space.Jm, function_space.AllGauss[:,0],
             LagrangeElemCoords, EulerELemCoords, fem_solver.requires_geometry_update)
-        # PARAMETERS FOR INCOMPRESSIBILITY (MEAN DILATATION METHOD HU-WASHIZU)
-        if material.is_nearly_incompressible:
-            stiffness_k = self.VolumetricStiffnessIntegrand(material, SpatialGradient, detJ, dV)
         # COMPUTE WORK-CONJUGATES AND HESSIAN AT THIS GAUSS POINT
         CauchyStressTensor, H_Voigt = material.KineticMeasures(F,elem=elem)
         # COMPUTE LOCAL CONSTITUTIVE STIFFNESS AND TRACTION
@@ -200,8 +163,6 @@ class DisplacementFormulation(VariationalPrinciple):
         # COMPUTE GEOMETRIC STIFFNESS
         if material.nature != "linear":
             stiffness += self.__GeometricStiffnessIntegrand__(SpatialGradient,CauchyStressTensor,detJ)
-        if material.is_nearly_incompressible:
-            stiffness += stiffness_k
 
         return stiffness, tractionforce
 

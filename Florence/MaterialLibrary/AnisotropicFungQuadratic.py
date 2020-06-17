@@ -33,7 +33,6 @@ class AnisotropicFungQuadratic(Material):
 
         # LOW LEVEL DISPATCHER
         self.has_low_level_dispatcher = True
-        #self.has_low_level_dispatcher = False
 
     def KineticMeasures(self,F, elem=0):
         N = self.anisotropic_orientations[elem,:,:]
@@ -60,8 +59,12 @@ class AnisotropicFungQuadratic(Material):
 
         H_Voigt = 2.*mu*J**(-5./3.) * (1./9.*trb*einsum('ij,kl',I,I) - \
                 1./3.*einsum('ij,kl',I,b) - 1./3.*einsum('ij,kl',b,I) + \
-                1./6.*trb*(einsum('il,jk',I,I) + einsum('ik,jl',I,I)) ) + \
-                kappa*((2.*J-1.)*einsum('ij,kl',I,I) - (J-1.)*(einsum('ik,jl',I,I) + einsum('il,jk',I,I)))
+                1./6.*trb*(einsum('il,jk',I,I) + einsum('ik,jl',I,I)) )
+                
+        if self.is_nearly_incompressible:
+            H_Voigt += self.pressure*(einsum('ij,kl',I,I) - (einsum('ik,jl',I,I) + einsum('il,jk',I,I)))
+        else:
+            H_Voigt += kappa*((2.*J-1.)*einsum('ij,kl',I,I) - (J-1.)*(einsum('ik,jl',I,I) + einsum('il,jk',I,I)))
 
         # Anisotropic contibution
         nfibres = self.anisotropic_orientations.shape[1]
@@ -94,7 +97,12 @@ class AnisotropicFungQuadratic(Material):
         elif self.ndim == 2:
             trb = trace(b) + 1
 
-        stress = mu*J**(-5./3.)*(b - 1./3.*trb*I) + kappa*(J-1.)*I
+        stress = mu*J**(-5./3.)*(b - 1./3.*trb*I)
+        
+        if self.is_nearly_incompressible:
+            stress += self.pressure*I
+        else:
+            stress += kappa*(J-1.)*I
 
         # Anisotropic contibution
         nfibres = self.anisotropic_orientations.shape[1]

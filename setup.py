@@ -324,11 +324,12 @@ class FlorenceSetup(object):
         cm_path = os.path.join(_pwd_,"VariationalPrinciple","_ConstitutiveStiffness_")
         tm_path = os.path.join(_pwd_,"VariationalPrinciple","_Traction_")
         mm_path = os.path.join(_pwd_,"VariationalPrinciple","_Mass_")
+        vm_path = os.path.join(_pwd_,"VariationalPrinciple","_VolumetricStiffness_")
         material_path = os.path.join(_pwd_,"MaterialLibrary","LLDispatch")
         assemble_path = os.path.join(_pwd_,"FiniteElements","Assembly","_Assembly_")
 
         self.extension_paths = [tensor_path,jacobi_path,bp_path,
-            km_path,gm_path,cm_path,tm_path,mm_path,material_path,assemble_path]
+            km_path,gm_path,cm_path,tm_path,mm_path,vm_path,material_path,assemble_path]
         # self.extension_paths = [mm_path]
         # self.extension_paths = [assemble_path]
 

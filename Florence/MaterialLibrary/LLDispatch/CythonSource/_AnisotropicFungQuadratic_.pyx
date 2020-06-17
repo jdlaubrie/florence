@@ -15,11 +15,14 @@ cdef extern from "_AnisotropicFungQuadratic_.h" nogil:
         _AnisotropicFungQuadratic_() except +
         _AnisotropicFungQuadratic_(Real mu, Real kappa, Real k1, Real k2) except +
         void SetParameters(Real mu, Real kappa, Real k1, Real k2) except +
-        void KineticMeasures(Real *Snp, Real* Hnp, int ndim, int ngauss, const Real *Fnp, int nfibre, const Real *Nnp) except +
+        void KineticMeasures(Real *Snp, Real* Hnp, int ndim, int ngauss, const Real *Fnp, int nfibre,
+            const Real *Nnp, const Real pressure, int near_incomp) except +
 
 
 
 def KineticMeasures(material, np.ndarray[Real,ndim=3,mode='c'] F, np.ndarray[Real,ndim=2,mode='c'] N):
+    
+    cdef int near_incomp = int(material.is_nearly_incompressible)
     
     cdef int ndim = F.shape[2]
     cdef int ngauss = F.shape[0]
@@ -32,8 +35,10 @@ def KineticMeasures(material, np.ndarray[Real,ndim=3,mode='c'] F, np.ndarray[Rea
     elif ndim==2:
         hessian = np.zeros((ngauss,3,3),dtype=np.float64)
 
+    cdef Real pressure = material.pressure
+
     cdef _AnisotropicFungQuadratic_[Real] mat_obj = _AnisotropicFungQuadratic_()
     mat_obj.SetParameters(material.mu,material.kappa,material.k1,material.k2)
-    mat_obj.KineticMeasures(&stress[0,0,0], &hessian[0,0,0], ndim, ngauss, &F[0,0,0], nfibre, &N[0,0])
+    mat_obj.KineticMeasures(&stress[0,0,0], &hessian[0,0,0], ndim, ngauss, &F[0,0,0], nfibre, &N[0,0], pressure, near_incomp)
 
     return stress, hessian

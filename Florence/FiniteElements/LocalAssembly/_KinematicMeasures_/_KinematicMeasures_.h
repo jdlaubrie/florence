@@ -5,7 +5,7 @@
 #ifdef USE_AVX_VERSION
 
 template<int ndim, typename std::enable_if<ndim==2,bool>::type = 0>
-FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *detJ, const Real *Jm_,
+FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *detJ, Real *dV, const Real *Jm_,
     const Real *AllGauss_, const Real *LagrangeElemCoords_, const Real *EulerElemCoords_,
     int ngauss, int nodeperelem, int update)  {
 
@@ -39,6 +39,7 @@ FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *de
         else {
             detJ[g] = AllGauss_[g]*fabs(detX);
         }
+        dV[g] = AllGauss_[g]*fabs(detX);
 
         _matmul_(ndim,nodeperelem,ndim,invParentGradientX,current_Jm,MaterialGradient);
         _matmul_(ndim,nodeperelem,ndim,invParentGradientx,current_Jm,current_sp);
@@ -62,7 +63,7 @@ FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *de
 
 
 template<int ndim, typename std::enable_if<ndim==3,bool>::type = 0>
-FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *detJ, const Real *Jm_,
+FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *detJ, Real *dV, const Real *Jm_,
     const Real *AllGauss_, const Real *LagrangeElemCoords_, const Real *EulerElemCoords_,
     int ngauss, int nodeperelem, int update)  {
 
@@ -97,6 +98,7 @@ FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *de
         else {
             detJ[g] = AllGauss_[g]*fabs(detX);
         }
+        dV[g] = AllGauss_[g]*fabs(detX);
 
         _matmul_(ndim,nodeperelem,ndim,invParentGradientX,current_Jm,MaterialGradient);
         _matmul_(ndim,nodeperelem,ndim,invParentGradientx,current_Jm,current_sp);
@@ -121,17 +123,17 @@ FASTOR_INLINE void KinematicMeasures_(Real *SpatialGradient_, Real *F_, Real *de
 
 
 inline
-void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, const Real *Jm_,
+void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, Real *dV, const Real *Jm_,
     const Real *AllGauss_, const Real *LagrangeElemCoords_, const Real *EulerElemCoords_,
     int ngauss, int ndim, int nodeperelem, int update)  {
 
     if (ndim == 3) {
-        KinematicMeasures_<3>(SpatialGradient_, F_, detJ, Jm_,
+        KinematicMeasures_<3>(SpatialGradient_, F_, detJ, dV, Jm_,
             AllGauss_, LagrangeElemCoords_, EulerElemCoords_,
             ngauss, nodeperelem, update);
     }
     else {
-        KinematicMeasures_<2>(SpatialGradient_, F_, detJ, Jm_,
+        KinematicMeasures_<2>(SpatialGradient_, F_, detJ, dV, Jm_,
             AllGauss_, LagrangeElemCoords_, EulerElemCoords_,
             ngauss, nodeperelem, update);
     }
@@ -142,7 +144,7 @@ void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, const Real 
 #else
 
 
-void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, const Real *Jm_,
+void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, Real *dV, const Real *Jm_,
     const Real *AllGauss_, const Real *LagrangeElemCoords_, const Real *EulerElemCoords_,
     int ngauss, int ndim, int nodeperelem, int update)  {
 
@@ -230,6 +232,16 @@ void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, const Real 
             for (int i=0; i<ngauss; ++i) {
                 detJ[i] = AllGauss_[i]*fabs(det2x2(ParentGradientX+i*4));
             }
+        }
+    }
+    if (ndim==3) {
+        for (int i=0; i<ngauss; ++i) {
+            detJ[i] = AllGauss_[i]*fabs(det3x3(ParentGradientX+i*9));
+        }
+    }
+    else if (ndim==2) {
+        for (int i=0; i<ngauss; ++i) {
+            detJ[i] = AllGauss_[i]*fabs(det2x2(ParentGradientX+i*4));
         }
     }
 

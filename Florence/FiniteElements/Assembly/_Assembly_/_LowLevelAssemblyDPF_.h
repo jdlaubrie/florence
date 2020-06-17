@@ -56,6 +56,7 @@ void _GlobalAssemblyDPF_(const Real *points,
     Real *F                         = allocate<Real>(ngauss*ndim*ndim);
     Real *SpatialGradient           = allocate<Real>(ngauss*nodeperelem*ndim);
     Real *detJ                      = allocate<Real>(ngauss);
+    Real *dV                        = allocate<Real>(ngauss);
 
     Real *ElectricFieldx            = allocate<Real>(ngauss*ndim);
 
@@ -86,9 +87,11 @@ void _GlobalAssemblyDPF_(const Real *points,
         std::fill(F,F+ngauss*ndim*ndim,0.);
         std::fill(SpatialGradient,SpatialGradient+ngauss*nodeperelem*ndim,0.);
         std::fill(detJ,detJ+ngauss,0.);
+        std::fill(dV,dV+ngauss,0.);
         KinematicMeasures(  SpatialGradient,
                             F,
                             detJ,
+                            dV,
                             Jm,
                             AllGauss,
                             LagrangeElemCoords,

@@ -110,6 +110,8 @@ class Material(object):
         self.is_nonisotropic = is_nonisotropic
         self.anisotropic_orientations = anisotropic_orientations
 
+        self.pressure = 0.0
+
         self.has_low_level_dispatcher = False
 
 

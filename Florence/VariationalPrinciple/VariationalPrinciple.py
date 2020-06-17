@@ -349,7 +349,28 @@ class VariationalPrinciple(object):
             self.nvar = self.ndim
         return self.nvar
 
+    def VolumetricStiffnessIntegrand(self, material, SpatialGradient, detJ, dV):
+        """Computes the volumetric stiffness using Hu-Washizu on Mean Dilatation method"""
 
+        if material.has_low_level_dispatcher:
+            from ._VolumetricStiffness_ import _VolumetricStiffnessIntegrand_
+            stiffness, MeanVolume = _VolumetricStiffnessIntegrand_(material, SpatialGradient, detJ, dV, self.nvar)
+        else:
+            MaterialVolume = np.sum(dV)
+            CurrentVolume = np.sum(detJ)
+            # AVERAGE SPATIAL GRADIENT IN PHYSICAL ELEMENT [\frac{1}{v}\int\nabla(N)dv(nodeperelem x ndim)]
+            AverageSpatialGradient = np.einsum('ijk,i->jk',SpatialGradient,detJ)
+            AverageSpatialGradient = AverageSpatialGradient.flatten()
+            stiffness = np.einsum('i,j->ij',AverageSpatialGradient,AverageSpatialGradient)
+            MeanVolume = (CurrentVolume-MaterialVolume)/MaterialVolume
+
+            stiffness = np.true_divide(stiffness,MaterialVolume)
+
+        material.pressure = material.kappa*MeanVolume
+        stiffness *= material.kappa
+
+        return stiffness
+        
     def __call__(self,*args,**kwargs):
         """This is purely to get around pickling while parallelising"""
         return self.GetElementalMatrices(*args,**kwargs)

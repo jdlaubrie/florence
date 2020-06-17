@@ -30,7 +30,7 @@ public:
     template<typename T=U, size_t ndim>
     FASTOR_INLINE
     std::tuple<Tensor<T,ndim,ndim>, typename MechanicsHessianType<T,ndim>::return_type>
-    _KineticMeasures_(const T *Fnp, const T *Nnp, int nfibre) {
+    _KineticMeasures_(const T *Fnp, const T *Nnp, int nfibre, const T pressure, int near_incomp) {
 
         // CREATE FASTOR TENSORS
         Tensor<T,ndim,ndim> F;
@@ -46,7 +46,16 @@ public:
 	    T trb = trace(b);
 	    if (ndim==2) { trb += 1.; }
 	    T coeff0 = std::pow(J,-5./3.);
-        Tensor<T,ndim,ndim> stress = mu*coeff0*(b-1./3.*trb*I) + kappa*(J-1.)*I;
+	    // ISOCHORIC PART OF STRESS
+        Tensor<T,ndim,ndim> stress = mu*coeff0*(b-1./3.*trb*I);
+        
+        // VOLUMETRIC PART OF STRESS
+        if (near_incomp) {
+            stress += pressure*I;
+        }
+        else {
+            stress += kappa*(J-1.)*I;
+        }
 
         // FIND ELASTICITY TENSOR
         auto II_ijkl = einsum<Index<i,j>,Index<k,l>>(I,I);
@@ -57,8 +66,15 @@ public:
 	    auto bI_ijkl = einsum<Index<i,j>,Index<k,l>>(b,I);
 
         Tensor<T,ndim,ndim,ndim,ndim> elasticity = 2.*mu*coeff0*(1./9.*trb*II_ijkl-
-			1./3.*(Ib_ijkl+bI_ijkl)+1./6.*trb*(II_ikjl+II_iljk))+
-			kappa*((2.*J-1.)*II_ijkl-(J-1.)*(II_ikjl+II_iljk));
+			1./3.*(Ib_ijkl+bI_ijkl)+1./6.*trb*(II_ikjl+II_iljk));
+
+        // VOLUMETRIC PART OF STRESS
+        if (near_incomp) {
+            elasticity += pressure*(II_ijkl-(II_ikjl+II_iljk));
+        }
+        else {
+            elasticity += kappa*((2.*J-1.)*II_ijkl-(J-1.)*(II_ikjl+II_iljk));
+        }
 
 	// LOOP OVER FIBRES ORIENTATIONS
 	for (int n=0; n<nfibre; ++n) {
@@ -85,19 +101,20 @@ public:
 
 
     template<typename T>
-    void KineticMeasures(T *Snp, T* Hnp, int ndim, int ngauss, const T *Fnp, int nfibre, const T *Nnp);
+    void KineticMeasures(T *Snp, T* Hnp, int ndim, int ngauss, const T *Fnp, int nfibre, const T *Nnp,
+        const T pressure, int near_incomp);
 
 };
 
 template<> template<>
 void _AnisotropicFungQuadratic_<Real>::KineticMeasures<Real>(Real *Snp, Real* Hnp,
-    int ndim, int ngauss, const Real *Fnp, int nfibre, const Real *Nnp) {
+    int ndim, int ngauss, const Real *Fnp, int nfibre, const Real *Nnp, const Real pressure, int near_incomp) {
 
     if (ndim==3) {
         Tensor<Real,3,3> stress;
         Tensor<Real,6,6> hessian;
         for (int g=0; g<ngauss; ++g) {
-            std::tie(stress,hessian) =_KineticMeasures_<Real,3>(Fnp+9*g, Nnp, nfibre);
+            std::tie(stress,hessian) =_KineticMeasures_<Real,3>(Fnp+9*g, Nnp, nfibre, pressure, near_incomp);
             copy_fastor(Snp,stress,g*9);
             copy_fastor(Hnp,hessian,g*36);
         }
@@ -106,7 +123,7 @@ void _AnisotropicFungQuadratic_<Real>::KineticMeasures<Real>(Real *Snp, Real* Hn
         Tensor<Real,2,2> stress;
         Tensor<Real,3,3> hessian;
         for (int g=0; g<ngauss; ++g) {
-            std::tie(stress,hessian) =_KineticMeasures_<Real,2>(Fnp+4*g, Nnp, nfibre);
+            std::tie(stress,hessian) =_KineticMeasures_<Real,2>(Fnp+4*g, Nnp, nfibre, pressure, near_incomp);
             copy_fastor(Snp,stress,g*4);
             copy_fastor(Hnp,hessian,g*9);
         }

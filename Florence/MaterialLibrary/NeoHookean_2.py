@@ -53,7 +53,10 @@ class NeoHookean_2(Material):
             1./3.*(einsum('ij,kl',b,I) + einsum('ij,kl',I,b)) +\
             1./6.*trace(b)*(einsum('ik,jl',I,I) + einsum('il,jk',I,I)) )
         # VOLUMETRIC CHANGES
-        H_Voigt += kappa*((2.*J-1.)*einsum('ij,kl',I,I) - (J-1.)*(einsum('ik,jl',I,I) + einsum('il,jk',I,I)))
+        if self.is_nearly_incompressible:
+            H_Voigt += self.pressure*(einsum('ij,kl',I,I) - (einsum('ik,jl',I,I) + einsum('il,jk',I,I)))
+        else:
+            H_Voigt += kappa*((2.*J-1.)*einsum('ij,kl',I,I) - (J-1.)*(einsum('ik,jl',I,I) + einsum('il,jk',I,I)))
 
         H_Voigt = Voigt(H_Voigt,1)
 
@@ -72,6 +75,9 @@ class NeoHookean_2(Material):
         kappa = self.kappa
         
         stress = mu*J**(-5./3.)*(b - 1./3.*trace(b)*I)
-        stress += kappa*(J-1.)*I
+        if self.is_nearly_incompressible:
+            stress += self.pressure*I
+        else:
+            stress += kappa*(J-1.)*I
 
         return stress

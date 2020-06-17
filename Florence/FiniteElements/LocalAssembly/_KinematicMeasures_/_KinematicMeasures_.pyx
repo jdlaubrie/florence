@@ -12,7 +12,7 @@ ctypedef double Real
 
 
 cdef extern from "_KinematicMeasures_.h":
-    void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, const Real *Jm_,
+    void KinematicMeasures(Real *SpatialGradient_, Real *F_, Real *detJ, Real *dV, const Real *Jm_,
         const Real *AllGauss_, const Real *LagrangeElemCoords_, const Real *EulerElemCoords_,
         int ngauss, int ndim, int nodeperelem, int update) 
 
@@ -30,8 +30,9 @@ def _KinematicMeasures_(np.ndarray[Real, ndim=3, mode='c'] Jm,
     cdef np.ndarray[Real, ndim=3, mode='c'] F = np.zeros((ngauss,ndim,ndim),dtype=np.float64)
     cdef np.ndarray[Real, ndim=3, mode='c'] SpatialGradient = np.zeros((ngauss,nodeperelem,ndim),dtype=np.float64)
     cdef np.ndarray[Real, ndim=1] detJ = np.zeros(ngauss,dtype=np.float64)
+    cdef np.ndarray[Real, ndim=1] dV = np.zeros(ngauss,dtype=np.float64)
 
-    KinematicMeasures(&SpatialGradient[0,0,0], &F[0,0,0], &detJ[0], &Jm[0,0,0], &AllGauss[0],
+    KinematicMeasures(&SpatialGradient[0,0,0], &F[0,0,0], &detJ[0], &dV[0], &Jm[0,0,0], &AllGauss[0],
         &LagrangeElemCoords[0,0], &EulerElemCoords[0,0], ngauss, ndim, nodeperelem, update)
 
-    return SpatialGradient, F, detJ
+    return SpatialGradient, F, detJ, dV

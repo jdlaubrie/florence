@@ -83,7 +83,13 @@ def hyperelastic_vessel(p=1):
     fibre_direction = FibreDirections(mesh)
 
     # Define hyperelastic material for the vessel
+    #material = NeoHookean_2(ndim,
+    #        is_nearly_incompressible=True,
+    #        mu=144.*1050.,
+    #        kappa=144.*1050.*33.)
+
     material = AnisotropicFungQuadratic(ndim,
+            is_nearly_incompressible=True,
             mu=72.*525.,
             kappa=72.*525.*33.,
             k1=568.*525.,
